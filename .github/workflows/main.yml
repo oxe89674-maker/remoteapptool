@@ -1,0 +1,63 @@
+name: Simple Windows RDP (Ngrok Auto-Detect)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rdp:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Create User & Enable RDP
+        shell: pwsh
+        run: |
+          $Pass = ConvertTo-SecureString "KingRDP2025!" -AsPlainText -Force
+
+          if (-not (Get-LocalUser -Name "IPxKINGYT" -ErrorAction SilentlyContinue)) {
+            New-LocalUser -Name "IPxKINGYT" -Password $Pass -PasswordNeverExpires
+            Add-LocalGroupMember -Group "Administrators" -Member "IPxKINGYT"
+            Write-Output "User created"
+          } else {
+            Write-Output "User already exists"
+          }
+
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 0
+
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+      - name: Download Ngrok, Detect Path & Start RDP Tunnel
+        shell: pwsh
+        run: |
+          # Download ngrok
+          Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+          Expand-Archive ngrok.zip -Force
+
+          # Detect ngrok.exe path dynamically
+          $NgrokPath = Get-ChildItem -Path $PWD -Recurse -Filter ngrok.exe | Select-Object -First 1
+
+          if (-not $NgrokPath) {
+            Write-Error "ngrok.exe not found!"
+            exit 1
+          }
+
+          $NgrokExe = $NgrokPath.FullName
+          Write-Output "Ngrok detected at: $NgrokExe"
+
+          # Configure ngrok (INLINE TOKEN)
+          & $NgrokExe config add-authtoken 3BhU8U4FkMN6HFOU78wP5GmPCrH_6pAwDKu3cfVHQeA9Gt8d8
+
+          Write-Output ""
+          Write-Output "======================================"
+          Write-Output "   ★ WINDOWS RDP READY ★"
+          Write-Output "   USERNAME : IPxKINGYT"
+          Write-Output "   PASSWORD : KingRDP2025!"
+          Write-Output "======================================"
+          Write-Output ""
+          Write-Output "Ngrok TCP tunnel starting..."
+          Write-Output "Look below for: tcp://HOST:PORT"
+          Write-Output ""
+
+          # Start RDP tunnel using detected path
+          & $NgrokExe tcp 3389
